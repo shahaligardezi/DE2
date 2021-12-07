@@ -1,0 +1,232 @@
+
+rm(list=ls())
+
+getwd()
+setwd("/Users/shahali/Documents/fall_semester/data_eng2/my_files_DE2/Week3/serverless")
+
+library(rvest)
+install.packages("aws.comprehend", repos = c(cloudyr = "http://cloudyr.github.io/drat", getOption("repos")))
+library(xml2)
+library(dplyr)
+library(data.table)
+library(httr)
+library("aws.comprehend")
+library(ggthemes)
+library(ggplot2)
+library(tidyr)
+library(wordcloud)
+library(tidyverse)
+#install.packages("esquisse")
+library(esquisse)
+library(plotrix)
+install.packages("hrbrthemes")
+library(hrbrthemes)
+library(viridis)
+
+# Set up  R w/ AWS
+keyfile = list.files(path=".", pattern="accessKeys.csv", full.names=TRUE)
+if (identical(keyfile, character(0))){
+  stop("ERROR: AWS key file not found")
+} 
+
+keyTable <- read.csv(keyfile, header = T) # *accessKeys.csv == the CSV downloaded from AWS containing your Access & Secret keys
+AWS_ACCESS_KEY_ID <- as.character(keyTable$Access.key.ID)
+AWS_SECRET_ACCESS_KEY <- as.character(keyTable$Secret.access.key)
+
+#activate
+Sys.setenv("AWS_ACCESS_KEY_ID" = AWS_ACCESS_KEY_ID,
+           "AWS_SECRET_ACCESS_KEY" = AWS_SECRET_ACCESS_KEY,
+           "AWS_DEFAULT_REGION" = "eu-west-1") 
+
+
+library("aws.comprehend")
+
+
+# DAWN News Pakistan ---------
+rm(dawn_desp)
+
+dawn_webpage <- read_html("https://www.dawn.com/news/1515830")
+dawn_desp <- dawn_webpage %>% html_nodes('p:nth-child(10) , p:nth-child(9) , .py-4+ p , p:nth-child(11) , p:nth-child(12) , p:nth-child(15) , p:nth-child(16) , p:nth-child(18) , p:nth-child(19) , p:nth-child(20) , p:nth-child(21) , p:nth-child(22) , p:nth-child(23) , #5dc821fedac0c+ p , p:nth-child(28) , p:nth-child(29) , p:nth-child(30) , p:nth-child(31) , p:nth-child(32) , p:nth-child(33) , p:nth-child(36) , .media--right:nth-child(34) .media__caption , p:nth-child(37) , p:nth-child(38) , p:nth-child(39) , p:nth-child(40) , p:nth-child(41) , .mt-1 p:nth-child(2) , .mt-1 p:nth-child(1)') %>% html_text()
+
+
+#eg2 <- dawn_webpage %>% html_nodes(' p:nth-child(9)') %>% html_text()
+#View(eg2)
+#eg22 <- detect_sentiment(eg2)
+#View(eg22)
+
+#Combined
+comb_dawn <- paste0(dawn_desp,collapse= "") 
+detect_language(comb_dawn)
+
+#eg1 <- detect_sentiment(comb_dawn)
+#View (eg1)
+
+comb_dawn_senti <-  detect_sentiment(comb_dawn)
+
+View(comb_dawn_senti)
+
+comb_dawn_senti$Sentiment <- NULL 
+
+pak_com <- comb_dawn_senti %>% gather('Sentiment', 'Sentiment_Score',-1)
+
+pak_com <-  pak_com[-c(1,2),]
+
+pak_com$percentage <- paste0(round((pak_com$Sentiment_Score/sum(pak_com$Sentiment_Score)*100),2),"%")
+
+pie3D(pak_com$Sentiment_Score,
+      col = hcl.colors(length(pak_com$Sentiment_Score), "Spectral"),
+      labels = pak_com$Sentiment,labelcex=1.1, labelrad=1.4,theta=1,radius =1,
+      explode=0.2 , main="Dawn Article Analysis")
+
+# legend(1,0.7,legend=table$countries,cex=0.7,yjust=0.2, xjust = -0.1,
+#        fill = heat.colors(length(table$num))) 
+
+# Indiviual
+dawn_statement_senti <-  detect_sentiment(dawn_desp)
+
+dawn_statement_senti$Sentiment <-  NULL
+
+pak_statements <- dawn_statement_senti %>% gather('Sentiment', 'Sentiment_Score',-1)
+ggplot(data = pak_statements,aes(x= Index, y = Sentiment_Score ,fill = Sentiment))+
+  geom_bar(stat="identity", position ="fill")+
+  scale_fill_viridis(discrete = T)+
+  ggtitle("Dawn News (Pakistan)")+
+  theme_ipsum()
+
+
+#Title 
+dawn_title <- dawn_webpage %>%  html_node('.border-b-grey-default .story__link') %>% html_text()
+
+dt <-  detect_sentiment(dawn_title)
+View(dt)
+pak_title_senti <- detect_sentiment(dawn_title)
+
+pak_title_senti$Sentiment <- NULL
+
+pak_title_senti <- pak_title_senti %>% gather('Sentiment', 'Sentiment_Score',-1)
+pak_title_senti <- pak_title_senti[-c(1,2),]
+
+pie3D(pak_title_senti$Sentiment_Score,
+      col = hcl.colors(length(pak_title_senti$Sentiment_Score), "Spectral"),
+      labels = pak_title_senti$Sentiment,labelcex=1.5, labelrad=1.7,theta=1,radius =1.5,
+      explode=0.3 , main="Title Sentiments: Dawn News")
+
+
+
+
+# THE HINDU - India ---------------------------
+
+hindu2 <- read_html("https://www.wionews.com/india-news/india-concerned-about-kartarpur-corridor-security-underlying-designs-of-pak-260482")
+hindu2_des <- hindu2 %>% html_nodes('p:nth-child(14) , p:nth-child(18) , p:nth-child(20) , p:nth-child(6) , .adATF+ p , p:nth-child(10) , p:nth-child(12) , p:nth-child(11) , p:nth-child(1)') %>% html_text()
+
+#combined
+comb_hindu2 <- paste0(hindu2_des,collapse= "")
+comb_hindu2_senti <- detect_sentiment(comb_hindu2)
+
+View(comb_hindu2_senti)
+
+comb_hindu2_senti$Sentiment <- NULL 
+
+hindu_com <- comb_hindu2_senti %>% gather('Sentiment', 'Sentiment_Score',-1)
+
+hindu_com <- hindu_com[-c(1,4),]
+#hindu_com$Sentiment_Score[1] <- 0.1
+
+pie3D(hindu_com$Sentiment_Score,
+      col = hcl.colors(length(pak_com$Sentiment_Score), "Spectral"),
+      labels = hindu_com$Sentiment,labelcex=1.1, labelrad=1.4,theta=1,radius =1,
+      explode=0.2 , main="The Hindu Article Analysis")
+
+
+#Indiviual 
+hindu_indi <-  detect_sentiment(hindu2_des)
+
+hindu_indi$Sentiment <-  NULL
+
+hindu_indi <- hindu_indi %>% gather('Sentiment', 'Sentiment_Score',-1)
+ggplot(data = hindu_indi,aes(x= Index, y = Sentiment_Score ,fill = Sentiment))+
+  geom_bar(stat="identity", position ="fill")+
+  scale_fill_viridis(discrete = T)+
+  ggtitle("The Hindu (India)")+
+  theme_ipsum()
+
+
+
+#Title
+hindu2_title <- hindu2 %>% html_nodes('h1') %>% html_text()
+hindu_title_senti <- detect_sentiment(hindu2_title)
+
+ht <-  detect_sentiment(hindu2_title)
+View(ht)
+ht$Sentiment <- NULL
+ht <- ht %>% gather('Sentiment', 'Sentiment_Score',-1)
+
+
+hindu_title_senti$Sentiment <- NULL
+
+hindu_title_senti <- hindu_title_senti %>%  gather('Sentiment', 'Sentiment_Score',-1)
+
+hindu_title_senti <- hindu_title_senti %>% filter(!(hindu_title_senti$Sentiment == 'Mixed')) 
+
+hindu_title_senti <- hindu_title_senti %>% filter(!(hindu_title_senti$Sentiment == 'Positive'))
+
+
+#hindu_title_senti <- hindu_title_senti %>%  gather('Sentiment', 'Sentiment_Score',-1)
+hindu_title_senti$percentage <- paste0(round((hindu_title_senti$Sentiment_Score/sum(hindu_title_senti$Sentiment_Score)*100),2),"%")
+library(plotrix)
+pieh <-  pie3D(hindu_title_senti$Sentiment_Score,
+             col = hcl.colors(length(hindu_title_senti$Sentiment_Score), "Spectral"),
+             labels = hindu_title_senti$Sentiment,labelcex=1.5, labelrad=1.7,theta=1,radius =1.5,
+             explode=0.3 , main="Title Sentiments: The Hindu")
+ 
+hindu_title_senti <- hindu_title_senti[-c(4),]
+ 
+ 
+## word cloud##
+ install.packages("wordcloud2")
+ library(wordcloud)
+ install.packages("RColorBrewer")
+ library(RColorBrewer)
+ library(tm)
+ 
+ 
+ # word_cloud_pak
+ 
+ phrase_dawn <- detect_phrases(comb_dawn)
+ phrase_dawn$Text
+pp<- paste0( phrase_dawn$Text, collapse= "")
+ 
+ docs <- Corpus(VectorSource(  phrase_dawn$Text))
+ inspect(docs)
+ dtm <- TermDocumentMatrix(docs)
+ m <- as.matrix(dtm)
+ v <- sort(rowSums(m),decreasing=TRUE)
+ d <- data.frame(word = names(v),freq=v)
+ d <- d[-c(1,5,6),]
+ d
+ head(d, 20)
+ 
+ set.seed(1234)
+ wordcloud(words = d$word, freq = d$freq, min.freq = 1,
+           max.words=180, random.order=TRUE, rot.per=0.35, 
+           colors=brewer.pal(8, "Dark2"))
+ 
+ # word_cloud_India
+ 
+ phrase_india <- detect_phrases(comb_hindu2)
+ phrase_india$Text
+ 
+ docs1 <- Corpus(VectorSource(  phrase_india$Text ))
+ inspect(docs1)
+ dtm1 <- TermDocumentMatrix(docs)
+ m1 <- as.matrix(dtm)
+ v1 <- sort(rowSums(m),decreasing=TRUE)
+ d1 <- data.frame(word = names(v),freq=v)
+ d1 <- d[-c(1,5,6),]
+ d1
+ head(d1, 20)
+ set.seed(1234)
+ wordcloud(words = d1$word, freq = d1$freq, min.freq = 1,
+           max.words=180, random.order=TRUE, rot.per=0.35, 
+           colors=brewer.pal(8, "Dark2"))
+ 
